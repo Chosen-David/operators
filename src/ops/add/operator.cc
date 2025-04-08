@@ -22,6 +22,7 @@ __C infiniopStatus_t infiniopCreateAddDescriptor(
     switch (handle->device) {
 #ifdef ENABLE_CPU
         case DevCpu:
+            std::cout<<"creat!"<<std::endl;
             return cpuCreateAddDescriptor(handle, (AddCpuDescriptor_t *) desc_ptr, c, a, b);
 #endif
 #ifdef ENABLE_NV_GPU

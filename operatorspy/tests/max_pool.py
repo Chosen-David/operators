@@ -101,6 +101,7 @@ def test(
     x_tensor = to_tensor(x, lib)
     y_tensor = to_tensor(y, lib)
     descriptor = infiniopMaxPoolDescriptor_t()
+    # print(f"x:{x}")
 
     check_error(
         lib.infiniopCreateMaxPoolDescriptor(

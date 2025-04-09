@@ -39,9 +39,11 @@ infiniopStatus_t cpuCreateReduceDescriptor(infiniopHandle_t handle,
                                            int noop_with_empty_axes,
                                            int reduce_type);
 
-// infiniopStatus_t cpuGetReduceWorkspaceSize(ReduceCpuDescriptor_t desc, uint64_t *size);
+infiniopStatus_t cpuGetReduceWorkspaceSize(ReduceCpuDescriptor_t desc, uint64_t *size);
 
 infiniopStatus_t cpuReduce(ReduceCpuDescriptor_t desc,
+                            void *workspace,
+                            uint64_t workspace_size,
                            void *y,
                            void const *x,
                            void *stream);

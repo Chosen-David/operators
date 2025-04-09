@@ -26,14 +26,24 @@ __C  infiniopStatus_t infiniopCreateReduceDescriptor(infiniopHandle_t handle,
         return STATUS_BAD_DEVICE;
        
 
-    }
+}
+__C infiniopStatus_t infiniopGetReduceWorkspaceSize(infiniopReduceDescriptor_t desc, uint64_t *size) {
+    switch (desc->device) {
+#ifdef ENABLE_CPU
+        case DevCpu:
+            return cpuGetReduceWorkspaceSize((ReduceCpuDescriptor_t) desc, size);
+#endif
 
-__C  infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc,void* y,const void* x,void *stream){
+    }
+    return STATUS_BAD_DEVICE;
+}
+
+__C  infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, void *workspace,uint64_t workspace_size,void* y,const void* x,void *stream){
     switch (desc->device)
     {
 #ifdef ENABLE_CPU
     case DevCpu:
-            return cpuReduce((ReduceCpuDescriptor_t) desc, y, x, stream);
+            return cpuReduce((ReduceCpuDescriptor_t) desc,workspace, workspace_size,  y, x, stream);
             std::cout<<"CPUReduce结束"<<std::endl;
 #endif
     }

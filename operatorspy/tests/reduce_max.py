@@ -146,13 +146,16 @@ def test(
     # Invalidate the shape and strides in the descriptor to prevent them from being directly used by the kernel
     x_tensor.descriptor.contents.invalidate()
     y_tensor.descriptor.contents.invalidate()
-    # workspaceSize = ctypes.c_uint64(0)
-    # check_error(
-    #     lib.infiniopGetReduceMaxWorkspaceSize(descriptor, ctypes.byref(workspaceSize))
-    # )
+    workspaceSize = ctypes.c_uint64(0)
+    check_error(
+        lib.infiniopGetReduceMaxWorkspaceSize(descriptor, ctypes.byref(workspaceSize))
+    )
+    workspace = torch.zeros(int(workspaceSize.value), dtype=torch.uint8).to(torch_device)
+    workspace_ptr = ctypes.cast(workspace.data_ptr(), ctypes.POINTER(ctypes.c_uint8))
     print("Input:", x)
     print("indices:", axes)
-    check_error(lib.infiniopReduceMax(descriptor,y_tensor.data,x_tensor.data,None))
+    check_error(lib.infiniopReduceMax(descriptor, workspace_ptr,
+                workspaceSize,y_tensor.data,x_tensor.data,None))
     print("Output:", y)
     print("Expected Answer:", ans)
 
@@ -201,6 +204,8 @@ if __name__ == "__main__":
     lib.infiniopReduceMax.restype=c_int32
     lib.infiniopReduceMax.argtypes=[
         infiniopReduceMaxDescriptor_t,
+        c_void_p,
+        c_uint64,
         c_void_p,
         c_void_p,
         c_void_p,

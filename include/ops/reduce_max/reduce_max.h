@@ -20,8 +20,10 @@ __C __export infiniopStatus_t infiniopCreateReduceMaxDescriptor(infiniopHandle_t
     int noop_with_empty_axes);
 
 
+__C __export infiniopStatus_t infiniopGetReduceMaxWorkspaceSize(infiniopReduceMaxDescriptor_t desc, uint64_t *size);
 
 __C __export infiniopStatus_t infiniopReduceMax(infiniopReduceMaxDescriptor_t desc,
+    void *workspace, uint64_t workspace_size,
     void *y,
     void const *x,
     void *stream);

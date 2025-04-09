@@ -86,7 +86,13 @@ infiniopStatus_t cpuCreateReduceDescriptor(infiniopHandle_t handle,
         return STATUS_SUCCESS;
 }
 
-
+infiniopStatus_t cpuGetReduceWorkspaceSize(ReduceCpuDescriptor_t desc, uint64_t *size) {
+    *size = desc->y_size;
+    if (desc->dt == F16) {
+        *size += desc->y_size * sizeof(float);
+    }
+    return STATUS_SUCCESS;
+}
 
 
 infiniopStatus_t cpuDestroyReduceDescriptor(ReduceCpuDescriptor_t desc) {
@@ -206,7 +212,7 @@ bool is_in_axes(uint64_t n, const int64_t* axes, size_t n_axes) {
     return false;  // 没找到，返回 false
 }
 template<typename Xdata, typename Ydata>
-inline void reduce(ReduceCpuDescriptor_t desc, Ydata *y, Xdata const* x) {
+inline void reduce(ReduceCpuDescriptor_t desc, void *workspace, uint64_t workspace_size,Ydata *y, Xdata const* x) {
 
 
         // 获取输入张量 x 和输出张量 y 的形状和维度
@@ -286,7 +292,10 @@ inline void reduce(ReduceCpuDescriptor_t desc, Ydata *y, Xdata const* x) {
                     y[y_index] = *std::max_element(x_id.begin(),x_id.end());    
                     break;
                 case 1://Mean
-                    y[y_index]=std::accumulate(x_id.begin(), x_id.end(), 0ULL)/x_id.size();
+                {
+                    double sum = std::accumulate(x_id.begin(), x_id.end(), 0.0);  // 初始化 sum
+                    y[y_index] = sum / x_id.size();  // 计算均值
+                }
                     break;
                 case 2://Min
                     y[y_index]=*std::min_element(x_id.begin(), x_id.end());
@@ -321,18 +330,18 @@ void print_type(const T& x) {
 }
 
 template<typename Tdata>
-infiniopStatus_t reduce_cpu(ReduceCpuDescriptor_t desc,void* y,void const *x){
+infiniopStatus_t reduce_cpu(ReduceCpuDescriptor_t desc,void *workspace, uint64_t workspace_size,void* y,void const *x){
     auto y_=reinterpret_cast<Tdata*>(y);
     auto x_ = reinterpret_cast<Tdata const *>(x);
     std::fill(y_, y_ + desc->y_size, 0);
    
-    reduce<Tdata,Tdata>(desc, y_,  x_);
+    reduce<Tdata,Tdata>(desc,workspace, workspace_size, y_,  x_);
     return STATUS_SUCCESS; 
 }
 template<>
-infiniopStatus_t reduce_cpu<uint16_t>(ReduceCpuDescriptor_t desc, void* y, void const *x) {
+infiniopStatus_t reduce_cpu<uint16_t>(ReduceCpuDescriptor_t desc, void *workspace, uint64_t workspace_size,void* y, void const *x) {
     
-    auto y_ = reinterpret_cast<float*>(y);
+    auto y_ = reinterpret_cast<float*>(workspace);
     auto x_ = reinterpret_cast<uint16_t const*>(x);
 
     print_type(x_);
@@ -343,7 +352,7 @@ infiniopStatus_t reduce_cpu<uint16_t>(ReduceCpuDescriptor_t desc, void* y, void 
     std::fill(y_, y_ + desc->y_size, 0);
 
     // 调用 FP32 规约函数
-    reduce<uint16_t, float>(desc, y_, x_);
+    reduce<uint16_t, float>(desc, y_ + desc->y_size, workspace_size, y_, x_);
 
 
      //将 FP32 结果转换回 FP16
@@ -360,15 +369,17 @@ infiniopStatus_t reduce_cpu<uint16_t>(ReduceCpuDescriptor_t desc, void* y, void 
 }
 
 infiniopStatus_t cpuReduce(ReduceCpuDescriptor_t desc,
+    void *workspace, 
+    uint64_t workspace_size,
     void *y,
     void const *x,
     void *stream){
         if(desc->dt==F16){
-            return reduce_cpu<uint16_t>(desc,y,x);
+            return reduce_cpu<uint16_t>(desc,workspace, workspace_size,y,x);
   
         }
         if(desc->dt==F32){
-            return reduce_cpu<float>(desc,y,x);
+            return reduce_cpu<float>(desc,workspace, workspace_size,y,x);
         
         }
         return STATUS_BAD_TENSOR_DTYPE;

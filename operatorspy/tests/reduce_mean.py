@@ -18,10 +18,10 @@ from operatorspy import (
 )
 from operatorspy.tests.test_utils import get_args
 
-class ReduceMinDescriptor(Structure):
+class ReduceMeanDescriptor(Structure):
     _fields_ = [("device", c_int32)]
 
-infiniopReduceMinDescriptor_t = POINTER(ReduceMinDescriptor)
+infiniopReduceMeanDescriptor_t = POINTER(ReduceMeanDescriptor)
 
 def reduce(x, axes, keepdims, noop_with_empty_axes, reduce_type):
     reduce_layers = {
@@ -37,13 +37,7 @@ def reduce(x, axes, keepdims, noop_with_empty_axes, reduce_type):
         return x
 
     reduction_fn = reduce_layers[reduce_type]
-
-    if reduce_type in [0, 2]:
-        result = reduction_fn(x, dim=axes, keepdim=keepdims)
-    else:
-        result = reduction_fn(x, dim=axes, keepdim=keepdims)
-
-    return result
+    return reduction_fn(x, dim=axes, keepdim=keepdims)
 
 def inferShape(x_shape: List[int], axes: Optional[List[int]] = None, keepdims: bool = False, noop_with_empty_axes: bool = False) -> List[int]:
     if axes is None:
@@ -63,7 +57,7 @@ def tuple_to_void_p(py_tuple: Tuple):
     return ctypes.cast(data_array, ctypes.c_void_p)
 
 def test(lib, handle, torch_device, x_shape, axes, n_axes, keepdims, noop_with_empty_axes, reduce_type, tensor_dtype=torch.float16):
-    reduce_name = "ReduceMin"
+    reduce_name = "ReduceMean"
     print(f"Testing {reduce_name} on {torch_device} with x_shape: {x_shape}, axes: {axes}, dtype: {tensor_dtype}")
 
     x = torch.rand(x_shape, dtype=tensor_dtype).to(torch_device)
@@ -73,9 +67,9 @@ def test(lib, handle, torch_device, x_shape, axes, n_axes, keepdims, noop_with_e
     x_tensor = to_tensor(x, lib)
     y_tensor = to_tensor(y, lib)
 
-    descriptor = infiniopReduceMinDescriptor_t()
+    descriptor = infiniopReduceMeanDescriptor_t()
 
-    check_error(lib.infiniopCreateReduceMinDescriptor(
+    check_error(lib.infiniopCreateReduceMeanDescriptor(
         handle,
         ctypes.byref(descriptor),
         y_tensor.descriptor,
@@ -90,41 +84,42 @@ def test(lib, handle, torch_device, x_shape, axes, n_axes, keepdims, noop_with_e
     y_tensor.descriptor.contents.invalidate()
 
     workspaceSize = ctypes.c_uint64(0)
-    check_error(lib.infiniopGetReduceMinWorkspaceSize(descriptor, ctypes.byref(workspaceSize)))
+    check_error(lib.infiniopGetReduceMeanWorkspaceSize(descriptor, ctypes.byref(workspaceSize)))
 
     workspace = torch.zeros(int(workspaceSize.value), dtype=torch.uint8).to(torch_device)
     workspace_ptr = ctypes.cast(workspace.data_ptr(), ctypes.POINTER(ctypes.c_uint8))
 
-    check_error(lib.infiniopReduceMin(descriptor, workspace_ptr, workspaceSize, y_tensor.data, x_tensor.data, None))
+    check_error(lib.infiniopReduceMean(descriptor, workspace_ptr, workspaceSize, y_tensor.data, x_tensor.data, None))
 
     print("Output:", y)
     print("Expected:", ans)
 
     assert torch.allclose(y, ans, atol=0, rtol=1e-3)
-    check_error(lib.infiniopDestroyReduceMinDescriptor(descriptor))
+    check_error(lib.infiniopDestroyReduceMeanDescriptor(descriptor))
 
 def test_cpu(lib, test_cases):
     device = DeviceEnum.DEVICE_CPU
     handle = create_handle(lib, device)
     for x_shape, axes, n_axes, keepdims, noop_with_empty_axes, reduce_type in test_cases:
+        reduce_type=1
         test(lib, handle, "cpu", x_shape, axes, n_axes, keepdims, noop_with_empty_axes, reduce_type, tensor_dtype=torch.float16)
         test(lib, handle, "cpu", x_shape, axes, n_axes, keepdims, noop_with_empty_axes, reduce_type, tensor_dtype=torch.float32)
     destroy_handle(lib, handle)
 
 if __name__ == "__main__":
     test_cases = [
-        ((4, 4), [1], 1, True, False, 2),
-        ((3, 3, 3), [0, 1], 2, False, True, 2),
-        ((2, 4, 4, 4), [2], 1, True, False, 2),
+        ((4, 4), [1], 1, True, False, 1),
+        ((3, 3, 3), [0, 1], 2, False, True, 1),
+        ((2, 4, 4, 4), [2], 1, True, False, 1),
     ]
 
     args = get_args()
     lib = open_lib()
 
-    lib.infiniopCreateReduceMinDescriptor.restype = c_int32
-    lib.infiniopCreateReduceMinDescriptor.argtypes = [
+    lib.infiniopCreateReduceMeanDescriptor.restype = c_int32
+    lib.infiniopCreateReduceMeanDescriptor.argtypes = [
         infiniopHandle_t,
-        POINTER(infiniopReduceMinDescriptor_t),
+        POINTER(infiniopReduceMeanDescriptor_t),
         infiniopTensorDescriptor_t,
         infiniopTensorDescriptor_t,
         c_void_p,
@@ -132,18 +127,18 @@ if __name__ == "__main__":
         c_int,
         c_int,
     ]
-    lib.infiniopReduceMin.restype = c_int32
-    lib.infiniopReduceMin.argtypes = [
-        infiniopReduceMinDescriptor_t,
+    lib.infiniopReduceMean.restype = c_int32
+    lib.infiniopReduceMean.argtypes = [
+        infiniopReduceMeanDescriptor_t,
         c_void_p,
         c_uint64,
         c_void_p,
         c_void_p,
         c_void_p,
     ]
-    lib.infiniopDestroyReduceMinDescriptor.restype = c_int32
-    lib.infiniopDestroyReduceMinDescriptor.argtypes = [infiniopReduceMinDescriptor_t]
+    lib.infiniopDestroyReduceMeanDescriptor.restype = c_int32
+    lib.infiniopDestroyReduceMeanDescriptor.argtypes = [infiniopReduceMeanDescriptor_t]
 
     test_cpu(lib, test_cases)
 
-    print("\033[92mReduceMin test passed!\033[0m")
+    print("\033[92mReduceMean test passed!\033[0m")

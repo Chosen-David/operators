@@ -19,9 +19,11 @@ __C  infiniopStatus_t infiniopCreateReduceDescriptor(infiniopHandle_t handle,
     int noop_with_empty_axes,
     int reduce_type);
 
-// __C infiniopStatus_t infiniopGetReduceWorkspaceSize(infiniopReduceDescriptor_t desc, uint64_t *size);
+__C infiniopStatus_t infiniopGetReduceWorkspaceSize(infiniopReduceDescriptor_t desc, uint64_t *size);
 
 __C  infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, 
+void *workspace,
+uint64_t workspace_size,
 void *y, 
 void const *x, 
 void *stream);
